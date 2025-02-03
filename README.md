@@ -42,6 +42,9 @@ The Two-Tower architecture consists of:
    - **Precompute document embeddings** and store them in a **vector database** (FAISS/Annoy).
    - Convert incoming **queries into embeddings**.
    - Compute similarity and **retrieve the top 5 most relevant documents**.
+   - <p align="center">
+       <img src="img/TwoTowerInference.png" alt="Two Tower Inference Architecture" width="600"/>
+     </p>
 
 ---
 
