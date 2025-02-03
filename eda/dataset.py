@@ -67,7 +67,7 @@ class MSMarcoTripletGenerator:
         buffer_size = self.batch_size * 100
         examples_processed = 0
         dataset_iterator = iter(self.dataset)
-        pbar = tqdm(total=num_queries, desc="Generating Triplets", unit="query")
+        pbar = tqdm(total=num_queries, desc="Generating Triplets", unit=" query")
 
         while examples_processed < num_queries:
             try:
@@ -111,8 +111,6 @@ class MSMarcoTripletGenerator:
                     yield (query, passages, negative_passages)
 
                 pbar.update(1)
-                if examples_processed % 100 == 0:
-                    logger.info(f"Processed {examples_processed} queries")
             except StopIteration:
                 logger.info("Reached end of dataset")
                 break
@@ -130,7 +128,6 @@ class MSMarcoTripletGenerator:
         os.makedirs(os.path.dirname(str(output_path)), exist_ok=True)
 
         rows = []
-        # pbar = tqdm(desc="Collecting Samples", unit="sample")
         if url_inc:
             for item in self.generate_triplets(num_queries, url_inc=True):
                 query, pos_passages, pos_urls, neg_passages, neg_urls = item
@@ -146,7 +143,6 @@ class MSMarcoTripletGenerator:
                             "negative_url": neg_url,
                         }
                     )
-                    # pbar.update(1)
         else:
             for item in self.generate_triplets(num_queries, url_inc=False):
                 query, pos_passages, neg_passages = item
@@ -158,8 +154,6 @@ class MSMarcoTripletGenerator:
                             "negative_passage": neg_passage,
                         }
                     )
-                    # pbar.update(1)
-        # pbar.close()
 
         df = pd.DataFrame(rows)
         if format == "parquet":

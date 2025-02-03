@@ -144,7 +144,7 @@ def tokenize_word(
 
 def tokenize(
     text: str,
-    punctuation_map: dict[str, str],
+    punctuation_map: dict[str, str] | None,
     stemmer: PorterStemmer | Any = None,
     lemmer: WordNetLemmatizer | Any = None,
     junk_punctuations: bool = False,
