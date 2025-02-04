@@ -1,12 +1,16 @@
 import argparse
+import json
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
+import gensim.downloader as api
 import pandas as pd
 from constants import punctuation_map
+from gensim.models import KeyedVectors
 from nltk.stem import PorterStemmer, WordNetLemmatizer
+from nltk.tokenize import word_tokenize
 from tqdm import tqdm
 from utils import tokenize
 
@@ -85,6 +89,44 @@ class Vocabulary:
             "general_unique_words": len(self.word_freq),
         }
 
+    def evaluate_with_pretrained(self, model_name: str):
+        """
+        Evaluate how much the current vocabulary aligns with a pretrained Word2Vec model.
+
+        Args:
+            model_name (str): Model name to pass into gensim.downloader's load function
+        """
+
+        # Load the pretrained word2vec model
+        pretrained_model = api.load(model_name)
+        pretrained_vocab = set(pretrained_model.key_to_index.keys())
+
+        # Calculate metrics
+        common_words_count = len(
+            set(self.word2idx.keys()).intersection(pretrained_vocab)
+        )
+        unique_words_count = len(set(self.word2idx.keys()).difference(pretrained_vocab))
+        missing_words_count = len(
+            pretrained_vocab.difference(set(self.word2idx.keys()))
+        )
+        percentage_in_pretrained = (common_words_count / len(self.word2idx)) * 100
+
+        return {
+            "common_words_count": common_words_count,
+            "unique_words_count": unique_words_count,
+            "missing_words_count": missing_words_count,
+            "total_pretrained_count": len(pretrained_vocab),
+            "percentage_in_pretrained": percentage_in_pretrained,
+        }
+
+    def load_from_file(self, vocab_file: str | Path):
+        """Load Vocabulary from a json file"""
+        with open(vocab_file, "r") as f:
+            vocab_data = json.load(f)
+            self.word2idx = vocab_data["word2idx"]
+            self.idx2word = {int(k): v for k, v in vocab_data["idx2word"].items()}
+            self.word_freq = Counter(vocab_data.get("word_freq", {}))
+
     def __len__(self):
         return len(self.word2idx)
 
@@ -103,6 +145,7 @@ class DatasetProcessor:
         min_freq: int = 1,
         punctuation_map: Optional[dict[str, str]] = {},
         junk_punctuations: bool = True,
+        tokenizer_type: Literal["custom", "word_tokenizer"] = "custom",
     ):
         """
         Initialize the dataset processor for creating a vocabulary from text data
@@ -116,6 +159,7 @@ class DatasetProcessor:
         self.vocabulary = Vocabulary(min_freq=min_freq)
         self.punctuation_map = punctuation_map
         self.junk_punctuations = junk_punctuations
+        self.tokenizer_type = tokenizer_type
 
     def process_text_columns(
         self,
@@ -142,15 +186,20 @@ class DatasetProcessor:
             # Tokenize each text entry in the column
             column_tokens = []
             for text in tqdm(
-                df[column].fillna(""), desc=f"Tokenizing the {column} column"
+                df[column].fillna(""),
+                desc=f"Tokenizing the {column} column with {self.tokenizer_type} tokenizer",
             ):
-                tokens = tokenize(
-                    text=text,
-                    punctuation_map=self.punctuation_map,
-                    stemmer=stemmer,
-                    lemmer=lemmer,
-                    junk_punctuations=self.junk_punctuations,
-                )
+                if self.tokenizer_type == "custom":
+                    tokens = tokenize(
+                        text=text,
+                        punctuation_map=self.punctuation_map,
+                        stemmer=stemmer,
+                        lemmer=lemmer,
+                        junk_punctuations=self.junk_punctuations,
+                    )
+                else:
+                    tokens = word_tokenize(text)
+
                 column_tokens.append(tokens)
             all_tokens.extend(column_tokens)
 
@@ -191,7 +240,6 @@ def parse_args():
     parser.add_argument(
         "--input-file",
         type=Path,
-        required=True,
         help="Input parquet file path",
     )
     parser.add_argument(
@@ -211,6 +259,12 @@ def parse_args():
         nargs="+",
         default=["query", "positive_passage", "negative_passage"],
         help="Text columns to process (default: query positive_passage negative_passage)",
+    )
+    parser.add_argument(
+        "--tokenizer_type",
+        type=str,
+        default="custom",
+        help="Specify the tokenizer type []",
     )
     parser.add_argument(
         "--use-stemming",
@@ -238,6 +292,16 @@ def parse_args():
         type=str,
         help="Path to log file (default: None, logs to stdout only)",
     )
+    parser.add_argument(
+        "--load-vocab",
+        type=Path,
+        help="Path to a saved vocabulary file to load and compare",
+    )
+    parser.add_argument(
+        "--pretrained-model",
+        type=str,
+        help="Name of the pretrained Word2Vec model to download for comparison",
+    )
     return parser.parse_args()
 
 
@@ -246,40 +310,61 @@ if __name__ == "__main__":
 
     # Setup logging
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    log_file = (
-        args.output_dir / f"vocab_build_{args.input_file.stem}.log"
-        if args.log_file
-        else None
-    )
+    if args.load_vocab:
+        log_file = (
+            args.output_dir / f"vocab_load_{args.load_vocab.stem}.log"
+            if args.log_file
+            else None
+        )
+    else:
+        log_file = (
+            args.output_dir / f"vocab_build_{args.input_file.stem}.log"
+            if args.log_file
+            else None
+        )
     logger = setup_logger(log_file)
 
     logger.info("Starting vocabulary building process")
-    logger.info(f"Input file: {args.input_file}")
-    logger.info(f"Processing columns: {args.columns}")
-
-    # Initialize processors
-    stemmer = PorterStemmer() if args.use_stemming else None
-    lemmer = WordNetLemmatizer() if args.use_lemmatization else None
-
-    processor = DatasetProcessor(
-        min_freq=args.min_freq,
-        punctuation_map=punctuation_map,
-        junk_punctuations=args.junk_punctuations,
-    )
 
     try:
-        logger.info("Processing input file...")
-        vocabulary = processor.process_parquet_file(
-            args.input_file,
-            columns=args.columns,
-            stemmer=stemmer,
-            lemmer=lemmer,
-        )
+        if args.load_vocab:
+            logger.info(f"Loading Vocabulary from {args.load_vocab}")
+            vocabulary = Vocabulary()
+            vocabulary.load_from_file(args.load_vocab)
+            logger.info("Vocabulary loaded successfully")
+
+        else:
+            logger.info(f"Input file: {args.input_file}")
+            logger.info(f"Processing columns: {args.columns}")
+
+            # Initialize processors
+            stemmer = PorterStemmer() if args.use_stemming else None
+            lemmer = WordNetLemmatizer() if args.use_lemmatization else None
+
+            processor = DatasetProcessor(
+                min_freq=args.min_freq,
+                punctuation_map=punctuation_map,
+                junk_punctuations=args.junk_punctuations,
+                tokenizer_type="word_tokenizer",
+            )
+            logger.info("Processing input file...")
+            vocabulary = processor.process_parquet_file(
+                args.input_file,
+                columns=args.columns,
+                stemmer=stemmer,
+                lemmer=lemmer,
+            )
 
         stats = vocabulary.get_word_stats()
-        logger.info(f"Vocabulary building completed successfully")
+        logger.info("Vocabulary building completed successfully")
         logger.info(f"Vocabulary size: {len(vocabulary)}")
         logger.info(f"Statistics: {stats}")
+
+        if args.pretrained_model:
+            logger.info(f"Comparing with pretrained model: {args.pretrained_model}")
+            alignment_stats = vocabulary.evaluate_with_pretrained(args.pretrained_model)
+            logger.info("Alignment with pretrained model:")
+            logger.info(alignment_stats)
 
         if args.save_vocab:
             vocab_file = args.output_dir / f"vocabulary_{args.input_file.stem}.json"

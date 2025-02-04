@@ -19,6 +19,7 @@ import nltk
 from nltk.stem import PorterStemmer, WordNetLemmatizer
 
 nltk.download("stopwords")
+nltk.download("punkt_tab")
 from nltk.corpus import stopwords
 
 STOP_WORDS = set(stopwords.words("english"))
