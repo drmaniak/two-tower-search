@@ -1,7 +1,9 @@
 import argparse
 import json
 import logging
+import pickle
 from collections import Counter
+from multiprocessing import process
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -142,6 +144,7 @@ class Vocabulary:
 class DatasetProcessor:
     def __init__(
         self,
+        output_path: str | Path,
         min_freq: int = 1,
         punctuation_map: Optional[dict[str, str]] = {},
         junk_punctuations: bool = True,
@@ -160,6 +163,23 @@ class DatasetProcessor:
         self.punctuation_map = punctuation_map
         self.junk_punctuations = junk_punctuations
         self.tokenizer_type = tokenizer_type
+        self.output_path = output_path
+        self.token_dict = {}
+
+    def save_tokenized_data(self, tokenized_data: dict):
+        """Save tokenized data and vocabulary to a file."""
+        with open(self.output_path, "wb") as f:
+            pickle.dump(
+                {"token_dict": tokenized_data, "vocabulary": self.vocabulary}, f
+            )
+
+    def load_tokenized_data(self, file_path: str | Path) -> dict:
+        """Load tokenized data and vocabulary from a file."""
+        with open(file_path, "rb") as f:
+            data = pickle.load(f)
+            self.token_dict = data["token_dict"]
+            self.vocabulary = data["vocabulary"]
+            return data["token_dict"]
 
     def process_text_columns(
         self,
@@ -167,6 +187,7 @@ class DatasetProcessor:
         columns: List[str],
         stemmer: PorterStemmer,
         lemmer: WordNetLemmatizer,
+        save_dataset: bool = False,
     ) -> Vocabulary:
         """
         Process multiple text columns from a dataframe to build a Vocabulary
@@ -178,33 +199,47 @@ class DatasetProcessor:
 
         all_tokens = []
 
+        tokenized_data = {}
+
         # Process each specified column
         for column in columns:
             if column not in df.columns:
                 continue
 
+            logging.info(f"Tokenizing {column} column")
+            tqdm.pandas(desc=f"Tokenizing {column} column")
             # Tokenize each text entry in the column
-            column_tokens = []
-            for text in tqdm(
-                df[column].fillna(""),
-                desc=f"Tokenizing the {column} column with {self.tokenizer_type} tokenizer",
-            ):
-                if self.tokenizer_type == "custom":
-                    tokens = tokenize(
-                        text=text,
-                        punctuation_map=self.punctuation_map,
-                        stemmer=stemmer,
-                        lemmer=lemmer,
-                        junk_punctuations=self.junk_punctuations,
+            if self.tokenizer_type.lower() == "custom":
+                token_series = (
+                    df[column]
+                    .fillna("")
+                    .progress_apply(
+                        lambda text: tokenize(
+                            text=text,
+                            punctuation_map=self.punctuation_map,
+                            stemmer=stemmer,
+                            lemmer=lemmer,
+                            junk_punctuations=self.junk_punctuations,
+                        )
                     )
-                else:
-                    tokens = word_tokenize(text)
+                )
+            else:
+                # token_series = df[column].fillna("").apply(word_tokenize)
+                token_series = df[column].fillna("").progress_apply(word_tokenize)
 
-                column_tokens.append(tokens)
-            all_tokens.extend(column_tokens)
+            tokenized_data[column] = token_series.tolist()
+            # all_tokens.extend(token_series.tolist())
 
-        self.vocabulary.build_vocabulary(all_tokens)
+        logging.info(f"Tokenized data added to {self.__class__.__name__} instance")
+        self.token_dict = tokenized_data
+        self.vocabulary.build_vocabulary(sum(tokenized_data.values(), []))
+        # self.vocabulary.build_vocabulary(all_tokens)
         self.vocabulary.finalize_vocabulary()
+
+        if save_dataset:
+            logging.info(f"Writing Tokens and Vocabulary to {self.output_path}")
+            self.save_tokenized_data(tokenized_data)
+            logging.info(f"Finished saving tokens & vocabulary to {self.output_path}")
 
         return self.vocabulary
 
@@ -214,9 +249,10 @@ class DatasetProcessor:
         columns: list[str],
         stemmer: PorterStemmer | Any,
         lemmer: WordNetLemmatizer | Any,
+        save_dataset: bool | Any,
     ) -> Vocabulary:
         df = pd.read_parquet(file_path)
-        return self.process_text_columns(df, columns, stemmer, lemmer)
+        return self.process_text_columns(df, columns, stemmer, lemmer, save_dataset)
 
 
 def setup_logger(log_file: Path | Any = None):
@@ -249,6 +285,12 @@ def parse_args():
         help="Directory to save the vocabulary and logs (default: ./data)",
     )
     parser.add_argument(
+        "--output-file",
+        type=Path,
+        default=Path("./vocab"),
+        help="Directory to save the vocabulary and logs (default: ./data)",
+    )
+    parser.add_argument(
         "--min-freq",
         type=int,
         default=2,
@@ -261,7 +303,7 @@ def parse_args():
         help="Text columns to process (default: query positive_passage negative_passage)",
     )
     parser.add_argument(
-        "--tokenizer_type",
+        "--tokenizer-type",
         type=str,
         default="custom",
         help="Specify the tokenizer type []",
@@ -277,7 +319,7 @@ def parse_args():
         help="Apply WordNet Lemmatization to tokens",
     )
     parser.add_argument(
-        "--save-vocab",
+        "--save-data",
         action="store_true",
         help="Save vocabulary to file",
     )
@@ -293,7 +335,7 @@ def parse_args():
         help="Path to log file (default: None, logs to stdout only)",
     )
     parser.add_argument(
-        "--load-vocab",
+        "--load-data",
         type=Path,
         help="Path to a saved vocabulary file to load and compare",
     )
@@ -308,11 +350,11 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    # Setup logging
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    if args.load_vocab:
+    output_filepath = args.output_dir / args.output_file
+    if args.load_data:
         log_file = (
-            args.output_dir / f"vocab_load_{args.load_vocab.stem}.log"
+            args.output_dir / f"vocab_load_{args.load_data.stem}.log"
             if args.log_file
             else None
         )
@@ -327,11 +369,18 @@ if __name__ == "__main__":
     logger.info("Starting vocabulary building process")
 
     try:
-        if args.load_vocab:
-            logger.info(f"Loading Vocabulary from {args.load_vocab}")
-            vocabulary = Vocabulary()
-            vocabulary.load_from_file(args.load_vocab)
-            logger.info("Vocabulary loaded successfully")
+        if args.load_data:
+            logger.info(f"Loading Tokens/Vocab from {args.load_data}")
+            processor = DatasetProcessor(
+                output_path=output_filepath,
+                min_freq=args.min_freq,
+                punctuation_map=punctuation_map,
+                junk_punctuations=args.junk_punctuations,
+                tokenizer_type="word_tokenizer",
+            )
+            processor.load_tokenized_data(args.load_data)
+            logger.info("Tokens/Vocabulary loaded successfully")
+            vocabulary = processor.vocabulary
 
         else:
             logger.info(f"Input file: {args.input_file}")
@@ -342,10 +391,11 @@ if __name__ == "__main__":
             lemmer = WordNetLemmatizer() if args.use_lemmatization else None
 
             processor = DatasetProcessor(
+                output_path=output_filepath,
                 min_freq=args.min_freq,
                 punctuation_map=punctuation_map,
                 junk_punctuations=args.junk_punctuations,
-                tokenizer_type="word_tokenizer",
+                tokenizer_type=args.tokenizer_type,
             )
             logger.info("Processing input file...")
             vocabulary = processor.process_parquet_file(
@@ -353,6 +403,7 @@ if __name__ == "__main__":
                 columns=args.columns,
                 stemmer=stemmer,
                 lemmer=lemmer,
+                save_dataset=args.save_data,
             )
 
         stats = vocabulary.get_word_stats()
@@ -365,19 +416,6 @@ if __name__ == "__main__":
             alignment_stats = vocabulary.evaluate_with_pretrained(args.pretrained_model)
             logger.info("Alignment with pretrained model:")
             logger.info(alignment_stats)
-
-        if args.save_vocab:
-            vocab_file = args.output_dir / f"vocabulary_{args.input_file.stem}.json"
-            vocab_data = {
-                "word2idx": vocabulary.word2idx,
-                "idx2word": {str(k): v for k, v in vocabulary.idx2word.items()},
-                "stats": stats,
-            }
-            import json
-
-            with open(vocab_file, "w") as f:
-                json.dump(vocab_data, f, indent=2)
-            logger.info(f"Vocabulary saved to: {vocab_file}")
 
     except Exception as e:
         logger.error(f"Error during vocabulary building: {str(e)}", exc_info=True)
