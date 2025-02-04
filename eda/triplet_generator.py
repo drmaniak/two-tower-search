@@ -219,7 +219,7 @@ def parse_args():
     parser.add_argument(
         "--split",
         type=str,
-        choices=["train", "validation"],
+        choices=["train", "validation", "test"],
         default="train",
         help="Dataset split to use (default: train)",
     )
