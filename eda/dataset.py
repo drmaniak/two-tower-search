@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import gensim.downloader as api
+import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -19,7 +20,7 @@ from vocabulary import Vocabulary
 
 def return_vocab_from_pickle(pickle_file: Path):
     with open(pickle_file, "rb") as f:
-        data = pickle.load(f)
+        data = joblib.load(f)
         logging.info(
             f"Loaded vocab from {pickle_file} with {len(data['vocabulary'])} unique words"
         )
@@ -149,10 +150,10 @@ class TwoTowerDataset(Dataset):
             max_len (Optional[int]): Maximum sequence length (if you wish to pad/truncate).
         """
         with open(token_path, "rb") as datafile:
-            tokens = pickle.load(datafile)
+            tokens = joblib.load(datafile)
 
         with open(vocab_path, "rb") as datafile:
-            vocab = pickle.load(datafile)
+            vocab = joblib.load(datafile)
 
         self.token_dict = tokens["token_dict"]
         self.word2idx = vocab["word2idx"]

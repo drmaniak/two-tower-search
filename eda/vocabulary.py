@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 import gensim.downloader as api
+import joblib
 import pandas as pd
 from constants import punctuation_map
 from gensim.models import KeyedVectors
@@ -176,7 +177,7 @@ class DatasetProcessor:
     def load_tokenized_data(self, file_path: str | Path) -> dict:
         """Load tokenized data and vocabulary from a file."""
         with open(file_path, "rb") as f:
-            data = pickle.load(f)
+            data = joblib.load(f)
             self.token_dict = data["token_dict"]
             self.vocabulary = data["vocabulary"]
             return data["token_dict"]
