@@ -77,6 +77,8 @@ def parse_args():
 
 
 def main():
+    from vocabulary import Vocabulary
+
     args = parse_args()
 
     # Initialize wandb
