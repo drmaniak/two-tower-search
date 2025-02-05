@@ -166,17 +166,32 @@ class TwoTowerDataset(Dataset):
         self.max_len_query = max_len_query
         self.max_len_docs = max_len_docs
 
+    def numericalize(self, tokens: List[str]) -> List[int]:
+        """
+        Convert a list of tokens into a list of indices using word2idx.
+        If a token is missing, use the <UNK> token index.
+        """
+        return [
+            self.word2idx.get(token, self.word2idx.get("<UNK>", 1)) for token in tokens
+        ]
+
     def __len__(self):
         return len(self.token_dict["query"])
 
     def __getitem__(self, idx):
-        query_indices = self.token_dict["query"][idx]
-        pos_indices = self.token_dict["positive_passage"][idx]
-        neg_indices = self.token_dict["negative_passage"][idx]
+        # Get raw token lists from token_dict
+        query_tokens = self.token_dict["query"][idx]
+        pos_tokens = self.token_dict["positive_passage"][idx]
+        neg_tokens = self.token_dict["negative_passage"][idx]
 
+        # Convert tokens to indices
+        query_indices = self.numericalize(query_tokens)
+        pos_indices = self.numericalize(pos_tokens)
+        neg_indices = self.numericalize(neg_tokens)
+
+        # Apply truncation if required
         if self.max_len_query is not None:
             query_indices = query_indices[: self.max_len_query]
-
         if self.max_len_docs is not None:
             pos_indices = pos_indices[: self.max_len_docs]
             neg_indices = neg_indices[: self.max_len_docs]
