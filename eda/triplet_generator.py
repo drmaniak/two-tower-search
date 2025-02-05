@@ -194,6 +194,80 @@ class MSMarcoTripletGenerator:
             yield current_batch
 
 
+class MSMarcoHardNegativeTripletGenerator:
+    def __init__(self, split: str = "train", batch_size: int = 100):
+        """Init the MS MARCO dataset loader
+
+        Args:
+            split (str): Dataset split to use ("train", "validation")
+            batch_size (int): Number of examples to process at once
+
+        """
+
+        self.split = split
+        self.batch_size = batch_size
+        self.dataset = None
+
+    def load_dataset(self):
+        """Load the MS MARCO dataset from Hugging Face"""
+
+        logger.info(f"Loading MS MARCO dataset split: {self.split}")
+
+        self.dataset = load_dataset(
+            "nixiesearch/ms-marco-hard-negatives", split=self.split
+        )
+
+    def save_flattened_samples(
+        self,
+        output_path: str | Path,
+        num_queries: int = 1000,
+        url_inc: bool = False,
+        format: str = "csv",
+    ):
+        logger.info(f"Saving flattened samples to {output_path}")
+        os.makedirs(os.path.dirname(str(output_path)), exist_ok=True)
+
+        # Load the dataset
+        self.load_dataset()
+
+        logger.info(f"Renaming columns and saving {output_path}")
+
+        rows = []
+        pbar = tqdm(
+            total=num_queries, desc="Flattening Hard Negative Samples", unit=" sample"
+        )
+        for i, example in enumerate(self.dataset):
+            if i >= num_queries:
+                break
+            query = example["query"]
+            positives = example["positive"]
+            negatives = example["negative"]
+
+            for pos in positives:
+                for neg in negatives:
+                    rows.append(
+                        {
+                            "query": query,
+                            "positive_passage": pos,
+                            "negative_passage": neg,
+                        }
+                    )
+            pbar.update(1)
+        # Keep only selected number of rows
+        df = pd.DataFrame(rows)
+
+        if format == "parquet":
+            df.to_parquet(output_path, index=False, compression="snappy")
+        elif format == "json":
+            df.to_json(output_path, index=False)
+        else:
+            df.to_csv(output_path, index=False)
+
+        logger.info(
+            f"Finished writing {len(df)} samples with hard negatives to {output_path}"
+        )
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate MS MARCO triplet datasets in various formats"
@@ -240,6 +314,11 @@ def parse_args():
         type=str,
         help="Base name for output file (default: auto-generated based on parameters)",
     )
+    parser.add_argument(
+        "--hard-negatives",
+        action="store_true",
+        help="Choose whether to download the hard negatives dataset or the normal one",
+    )
     return parser.parse_args()
 
 
@@ -250,7 +329,15 @@ if __name__ == "__main__":
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize generator
-    generator = MSMarcoTripletGenerator(split=args.split, batch_size=args.batch_size)
+    if args.hard_negatives:
+        logging.info("Download the hard negatives dataset")
+        generator = MSMarcoHardNegativeTripletGenerator(
+            split="train", batch_size=args.batch_size
+        )
+    else:
+        generator = MSMarcoTripletGenerator(
+            split=args.split, batch_size=args.batch_size
+        )
 
     # Generate output filename if not specified
     if args.output_name:
