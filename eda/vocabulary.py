@@ -170,7 +170,7 @@ class DatasetProcessor:
     def save_tokenized_data(self, tokenized_data: dict):
         """Save tokenized data and vocabulary to a file."""
         with open(self.output_path, "wb") as f:
-            pickle.dump(
+            joblib.dump(
                 {"token_dict": tokenized_data, "vocabulary": self.vocabulary}, f
             )
 

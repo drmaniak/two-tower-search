@@ -55,7 +55,7 @@ def create_global_vocab(
                 global_idx2word[len(global_idx2word)] = word
 
     with open(vocab_dir / output_file, "wb") as file:
-        pickle.dump({"word2idx": global_word2idx, "idx2word": global_idx2word}, file)
+        joblib.dump({"word2idx": global_word2idx, "idx2word": global_idx2word}, file)
 
     return global_word2idx, global_idx2word
 
@@ -82,7 +82,7 @@ def build_aligned_embedding_matrix(
     filepath = vocab_dir / embed_file
     logging.info(f"Writing to file {filepath}")
     with open(filepath, "wb") as file:
-        pickle.dump(embedding_matrix, file)
+        joblib.dump(embedding_matrix, file)
 
 
 def parse_args():
@@ -141,6 +141,7 @@ class TwoTowerDataset(Dataset):
         self,
         token_path: Path,
         vocab_path: Path,
+        embed_path: Path,
         max_len_query: Optional[int] = None,
         max_len_docs: Optional[int] = None,
     ):
@@ -155,9 +156,13 @@ class TwoTowerDataset(Dataset):
         with open(vocab_path, "rb") as datafile:
             vocab = joblib.load(datafile)
 
+        with open(embed_path, "rb") as datafile:
+            embeds = joblib.load(datafile)
+
         self.token_dict = tokens["token_dict"]
         self.word2idx = vocab["word2idx"]
         self.idx2word = vocab["idx2word"]
+        self.embedding_matrix = embeds
         self.max_len_query = max_len_query
         self.max_len_docs = max_len_docs
 
