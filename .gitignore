@@ -175,3 +175,12 @@ data/*
 !data/.gitkeep
 vocab/*
 !vocab/.gitkeep
+eda/train_triples_v1.1.json
+eda/valid_triples_v1.1.json
+eda/word_to_ids.pkl
+eda/chroma_langchain_db/
+eda/embeds.pkl
+eda/idx_to_word.pkl
+eda/passages_words.json
+eda/punctuation_map.json
+eda/queries_words.json
