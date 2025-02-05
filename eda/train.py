@@ -21,6 +21,8 @@ from loss_functions import (
 )  # The custom loss function provided by your teammate.
 from models import DocumentEncoder, QueryEncoder
 from torch.utils.data import DataLoader
+from tqdm import tqdm
+from vocabulary import Vocabulary
 
 
 def parse_args():
@@ -77,24 +79,23 @@ def parse_args():
 
 
 def main():
-    from vocabulary import Vocabulary
-
     args = parse_args()
 
     # Initialize wandb
     wandb.init(project="two-tower-training", config=vars(args))
 
-    # Set up logging.
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()],
     )
+
     logging.info("Starting training...")
 
     device = torch.device(args.device)
     # Create your dataset instance.
     # Here, TwoTowerDataset loads tokenized data, vocabulary, and aligned embedding matrix.
+    logging.info("Loading train dataset")
     train_dataset = TwoTowerDataset(
         token_path=args.train_token_path,
         vocab_path=args.vocab_path,
@@ -102,6 +103,7 @@ def main():
         max_len_query=30,
         max_len_docs=75,
     )
+    logging.info("Loading val dataset")
     val_dataset = TwoTowerDataset(
         token_path=args.val_token_path,
         vocab_path=args.vocab_path,
@@ -109,6 +111,7 @@ def main():
         max_len_query=128,
         max_len_docs=256,
     )
+    # logging.info("Loading hard-neg dataset")
     # hn_dataset = TwoTowerDataset(
     #     token_path=args.hn_token_path,
     #     vocab_path=args.vocab_path,
@@ -174,15 +177,16 @@ def main():
     criterion = TripletLoss(margin=args.margin)
 
     # Training loop.
-    for epoch in range(args.epochs):
+    for epoch in tqdm(range(args.epochs), desc="Training Loop Progress"):
         query_encoder.train()
         doc_encoder.train()
         total_loss = 0.0
         num_batches = 0
 
         # Zip the two dataloaders. (Ensure they yield batches in corresponding order.)
-        for query_batch, (pos_batch, neg_batch) in zip(
-            query_train_dataloader, document_train_dataloader
+        for query_batch, (pos_batch, neg_batch) in tqdm(
+            zip(query_train_dataloader, document_train_dataloader),
+            desc=f"Iterating through training batches in epoch {epoch}",
         ):
             # Move data to device.
             query_batch = query_batch.to(device)
@@ -214,11 +218,12 @@ def main():
 
         query_encoder.eval()
         doc_encoder.eval()
-        val_loss = 0.0
+        total_val_loss = 0.0
         num_val_batches = 0
         with torch.no_grad():
-            for query_batch, (pos_batch, neg_batch) in zip(
-                query_val_dataloader, document_val_dataloader
+            for query_batch, (pos_batch, neg_batch) in tqdm(
+                zip(query_val_dataloader, document_val_dataloader),
+                desc=f"Iterating through validation batches in epoch {epoch}",
             ):
                 query_batch = query_batch.to(device)
                 pos_batch = pos_batch.to(device)
@@ -230,19 +235,30 @@ def main():
 
                 val_loss = criterion(query_embeds, pos_embeds, neg_embeds)
 
-                val_loss += val_loss.item()
+                total_val_loss += val_loss.item()
                 num_val_batches += 1
 
-        avg_val_loss = val_loss / num_val_batches
+        avg_val_loss = total_val_loss / num_val_batches
         wandb.log({"epoch_val_loss": avg_val_loss, "epoch": epoch})
         print(f"Epoch {epoch}: Avg Val Loss: {avg_val_loss:.4f}")
 
     torch.save(query_encoder.state_dict(), "query_encoder.pth")
-    torch.save(doc_encoder.state_dict(), "query_encoder.pth")
+    torch.save(doc_encoder.state_dict(), "doc_encoder.pth")
     logging.info("Trained Models Saved")
     wandb.finish()
     logging.info("Training complete.")
 
 
 if __name__ == "__main__":
+    # Set up logging.
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
+    )
+    logging.info("Importing Vocabular")
+    from vocabulary import Vocabulary
+
+    logging.info(f"Vocab imported - sample class: {Vocabulary()}")
+
     main()
