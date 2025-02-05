@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import pickle
 from collections import Counter
 from multiprocessing import process
 from pathlib import Path

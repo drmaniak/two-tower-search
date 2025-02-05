@@ -188,6 +188,40 @@ class TwoTowerDataset(Dataset):
         }
 
 
+def collate_fn_query(batch, pad_idx: int):
+    """
+    Collate function for the query tower.
+    Expects each sample in the batch to have a key "query" containing a list of token indices.
+    Returns a padded tensor for the query sequences.
+    """
+    # Convert each query list to a tensor
+    query_tensors = [torch.tensor(item["query"], dtype=torch.long) for item in batch]
+    # Pad all queries to the maximum length in the batch
+    queries_padded = torch.nn.utils.rnn.pad_sequence(
+        query_tensors, batch_first=True, padding_value=pad_idx
+    )
+
+    return queries_padded
+
+
+def collate_fn_document(batch, pad_idx: int):
+    """
+    Collate function for the document tower.
+    Expects each sample in the batch to have keys "positive" and "negative" containing lists of token indices.
+    Returns two padded tensors: one for positives and one for negatives.
+    """
+    pos_tensors = [torch.tensor(item["positive"], dtype=torch.long) for item in batch]
+    neg_tensors = [torch.tensor(item["negative"], dtype=torch.long) for item in batch]
+    pos_padded = torch.nn.utils.rnn.pad_sequence(
+        pos_tensors, batch_first=True, padding_value=pad_idx
+    )
+    neg_padded = torch.nn.utils.rnn.pad_sequence(
+        neg_tensors, batch_first=True, padding_value=pad_idx
+    )
+
+    return pos_padded, neg_padded
+
+
 # ------------------------------------------------------------------------------
 # Example usage:
 # ------------------------------------------------------------------------------
