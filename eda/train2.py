@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Dict
 
+import joblib
 import torch
 import torch.optim as optim
 import wandb
@@ -228,7 +229,8 @@ def main():
     )
 
     # Load embedding matrix
-    embedding_matrix = torch.load(args.embed_path)
+    embedding_matrix = joblib.load(args.embed_path)
+    embedding_matrix = torch.tensor(embedding_matrix, dtype=torch.float32)
 
     # Initialize models
     query_encoder, doc_encoder = get_model(
@@ -296,4 +298,6 @@ def main():
 
 
 if __name__ == "__main__":
+    from vocabulary import Vocabulary
+
     main()
