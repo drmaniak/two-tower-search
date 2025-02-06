@@ -42,9 +42,7 @@ class MSMarcoTripletGenerator:
         """Load the MS MARCO dataset from Hugging Face"""
 
         logger.info(f"Loading MS MARCO dataset split: {self.split}")
-        self.dataset = load_dataset(
-            "ms_marco", "v2.1", split=self.split, streaming=True
-        )
+        self.dataset = load_dataset("ms_marco", "v2.1", split=self.split)
 
     @overload
     def generate_triplets(
@@ -63,11 +61,13 @@ class MSMarcoTripletGenerator:
             self.load_dataset()
 
         logger.info(f"Generating triplets for {num_queries}")
-        recent_examples_buffer = []
-        buffer_size = self.batch_size * 100
         examples_processed = 0
         dataset_iterator = iter(self.dataset)
         pbar = tqdm(total=num_queries, desc="Generating Triplets", unit=" query")
+
+        # Convert dataset to list for random sampling
+        all_examples = list(self.dataset)
+        dataset_size = len(all_examples)
 
         while examples_processed < num_queries:
             try:
@@ -78,27 +78,22 @@ class MSMarcoTripletGenerator:
                 passages: List[str] = current_example["passages"]["passage_text"]
                 positive_urls: List[str] = current_example["passages"]["url"]
 
-                recent_examples_buffer.append(current_example)
-                if len(recent_examples_buffer) > buffer_size:
-                    recent_examples_buffer.pop(0)
-
-                if len(recent_examples_buffer) < 2:
-                    pbar.update(1)
-                    continue
-
                 negative_passages: List[str] = []
                 negative_urls: List[str] = []
                 while len(negative_passages) < len(passages):
-                    neg_example = random.choice(recent_examples_buffer)
-                    if neg_example["query"] != query:
-                        rand_idx = random.randint(
-                            0, len(neg_example["passages"]["passage_text"]) - 1
-                        )
-                        neg_passage = neg_example["passages"]["passage_text"][rand_idx]
-                        neg_url = neg_example["passages"]["url"][rand_idx]
-                        negative_passages.append(neg_passage)
-                        negative_urls.append(neg_url)
+                    # Sample from the entire dataset
+                    while True:
+                        neg_example = random.choice(all_examples)
+                        if neg_example["query"] != query:  # Ensure different query
+                            break
 
+                    rand_idx = random.randint(
+                        0, len(neg_example["passages"]["passage_text"]) - 1
+                    )
+                    neg_passage = neg_example["passages"]["passage_text"][rand_idx]
+                    neg_url = neg_example["passages"]["url"][rand_idx]
+                    negative_passages.append(neg_passage)
+                    negative_urls.append(neg_url)
                 if url_inc:
                     yield (
                         query,
