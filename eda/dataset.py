@@ -214,7 +214,7 @@ def collate_fn_query(batch, pad_idx: int):
     """
     # Convert each query list to a tensor
     query_tensors = [torch.tensor(item["query"], dtype=torch.long) for item in batch]
-    query_lengths = torch.tensor(item["query_length"] for item in batch)
+    query_lengths = torch.tensor([item["query_length"] for item in batch])
 
     # Pad all queries to the maximum length in the batch
     queries_padded = torch.nn.utils.rnn.pad_sequence(
@@ -231,10 +231,10 @@ def collate_fn_document(batch, pad_idx: int):
     Returns two padded tensors: one for positives and one for negatives.
     """
     pos_tensors = [torch.tensor(item["positive"], dtype=torch.long) for item in batch]
-    pos_lengths = torch.tensor(item["positive_length"] for item in batch)
-
     neg_tensors = [torch.tensor(item["negative"], dtype=torch.long) for item in batch]
-    neg_lengths = torch.tensor(item["negative_length"] for item in batch)
+
+    pos_lengths = torch.tensor([item["positive_length"] for item in batch])
+    neg_lengths = torch.tensor([item["negative_length"] for item in batch])
 
     pos_padded = torch.nn.utils.rnn.pad_sequence(
         pos_tensors, batch_first=True, padding_value=pad_idx
