@@ -65,6 +65,9 @@ class Encoder(nn.Module):
         # Embed the input tokens
         embedded = self.embedding(x)  # shape: (batch_size, seq_length, embed_dim)
 
+        num_zeros = torch.sum(torch.all(embedded == 0, dim=-1)).item()
+        print(f"Number of zero embeddings: {num_zeros}")
+
         # If sequence lengths are provided, pack the sequence (helps LSTM ignore padding)
         if lengths is not None:
             packed = nn.utils.rnn.pack_padded_sequence(
