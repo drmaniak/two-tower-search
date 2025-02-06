@@ -10,9 +10,10 @@ from langchain_core.documents import Document
 import numpy as np
 import gensim.downloader as api
 
-DATA_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/'
-MODEL_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/'
-VOCAB_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/'
+DATA_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/train_triples_v1.1.json'
+MODEL_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/model_twotower1.pth'
+VOCAB_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/word_to_ids.pkl'
+
 CONTEXT_LEN = 40
 QUERY_LENGTH = 12
 MODEL_SIZE = 300
@@ -23,12 +24,12 @@ BATCH_SIZE = 64
 VOCAB_SIZE = 607348
 
 print('Load the data')
-with open(DATA_PATH+'train_triples_v1.1.json') as f:
+with open(DATA_PATH) as f:
     train = json.load(f)
     train = train[:640]
 
 print('Load the word2idx')
-word2idx = joblib.load(VOCAB_PATH+'word_to_ids.pkl')
+word2idx = joblib.load(VOCAB_PATH)
 
 #make lengths tensors
 query_lengths = torch.tensor([QUERY_LENGTH]*BATCH_SIZE, dtype=torch.int64)
@@ -56,7 +57,7 @@ def make_embedding_tensor(word2idx: dict) -> torch.Tensor:
 print('Load the two tower model')
 embeddings_tensor = make_embedding_tensor(word2idx)
 model = TwoTowerModel(OUTPUT_DIM, MODEL_SIZE, LSTM_HIDDEN_DIM_QUERY, LSTM_HIDDEN_DIM_DOC, embeddings_tensor)
-state_dict = torch.load(DATA_PATH+'model_twotower1.pth', map_location='cpu')
+state_dict = torch.load(MODEL_PATH, map_location='cpu')
 model.load_state_dict(state_dict)
 model.eval()
 

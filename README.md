@@ -56,3 +56,9 @@ TBD
 Clone the repository:
 
 TBD
+
+## Run chroma
+`python chroma_embed.py`
+need to have the model `model_twotower1.pth` (or other model)
+the vocabulary map `word_to_ids.pkl`
+the data we want to embed `train_triples_v1.1.json`
