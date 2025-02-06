@@ -100,16 +100,16 @@ def main():
         token_path=args.train_token_path,
         vocab_path=args.vocab_path,
         embed_path=args.embed_path,
-        max_len_query=40,
-        max_len_docs=80,
+        max_len_query=100,
+        max_len_docs=200,
     )
     logging.info("Loading val dataset")
     val_dataset = TwoTowerDataset(
         token_path=args.val_token_path,
         vocab_path=args.vocab_path,
         embed_path=args.embed_path,
-        max_len_query=40,
-        max_len_docs=80,
+        max_len_query=100,
+        max_len_docs=200,
     )
     # logging.info("Loading hard-neg dataset")
     # hn_dataset = TwoTowerDataset(
@@ -159,10 +159,10 @@ def main():
     # Instantiate the query and document encoders.
     # Here we use a common architecture; adjust hidden dimensions and dropout as desired.
     query_encoder = QueryEncoder(
-        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.3
+        embedding_tensor, hidden_dim=256, num_layers=2, bidirectional=True, dropout=0.3
     )
     doc_encoder = DocumentEncoder(
-        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.3
+        embedding_tensor, hidden_dim=256, num_layers=3, bidirectional=True, dropout=0.3
     )
 
     query_encoder.to(device)

@@ -1,0 +1,16 @@
+model:
+  hidden_dim: 256
+  output_dim: 256
+  num_layers: 2
+  bidirectional: true
+  dropout: 0.3
+
+data:
+  max_len_query: 40
+  max_len_docs: 80
+
+training:
+  batch_size: 32
+  learning_rate: 0.001
+  margin: 1.0
+  epochs: 10

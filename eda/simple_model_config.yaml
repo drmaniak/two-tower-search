@@ -1,0 +1,13 @@
+model:
+  hidden_dim: 256
+  output_dim: 256
+
+data:
+  max_len_query: 60
+  max_len_docs: 80
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  margin: 0.5
+  epochs: 10
