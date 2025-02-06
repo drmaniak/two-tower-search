@@ -198,8 +198,11 @@ class TwoTowerDataset(Dataset):
 
         return {
             "query": query_indices,
+            "query_length": len(query_indices),
             "positive": pos_indices,
+            "positive_length": len(pos_indices),
             "negative": neg_indices,
+            "negative_length": len(neg_indices),
         }
 
 
@@ -211,12 +214,14 @@ def collate_fn_query(batch, pad_idx: int):
     """
     # Convert each query list to a tensor
     query_tensors = [torch.tensor(item["query"], dtype=torch.long) for item in batch]
+    query_lengths = torch.tensor(item["query_length"] for item in batch)
+
     # Pad all queries to the maximum length in the batch
     queries_padded = torch.nn.utils.rnn.pad_sequence(
         query_tensors, batch_first=True, padding_value=pad_idx
     )
 
-    return queries_padded
+    return queries_padded, query_lengths
 
 
 def collate_fn_document(batch, pad_idx: int):
@@ -226,7 +231,11 @@ def collate_fn_document(batch, pad_idx: int):
     Returns two padded tensors: one for positives and one for negatives.
     """
     pos_tensors = [torch.tensor(item["positive"], dtype=torch.long) for item in batch]
+    pos_lengths = torch.tensor(item["positive_length"] for item in batch)
+
     neg_tensors = [torch.tensor(item["negative"], dtype=torch.long) for item in batch]
+    neg_lengths = torch.tensor(item["negative_length"] for item in batch)
+
     pos_padded = torch.nn.utils.rnn.pad_sequence(
         pos_tensors, batch_first=True, padding_value=pad_idx
     )
@@ -234,7 +243,7 @@ def collate_fn_document(batch, pad_idx: int):
         neg_tensors, batch_first=True, padding_value=pad_idx
     )
 
-    return pos_padded, neg_padded
+    return (pos_padded, pos_lengths), (neg_padded, neg_lengths)
 
 
 # ------------------------------------------------------------------------------

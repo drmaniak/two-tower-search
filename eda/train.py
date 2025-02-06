@@ -100,16 +100,16 @@ def main():
         token_path=args.train_token_path,
         vocab_path=args.vocab_path,
         embed_path=args.embed_path,
-        max_len_query=30,
-        max_len_docs=75,
+        max_len_query=40,
+        max_len_docs=80,
     )
     logging.info("Loading val dataset")
     val_dataset = TwoTowerDataset(
         token_path=args.val_token_path,
         vocab_path=args.vocab_path,
         embed_path=args.embed_path,
-        max_len_query=128,
-        max_len_docs=256,
+        max_len_query=40,
+        max_len_docs=80,
     )
     # logging.info("Loading hard-neg dataset")
     # hn_dataset = TwoTowerDataset(
@@ -159,10 +159,10 @@ def main():
     # Instantiate the query and document encoders.
     # Here we use a common architecture; adjust hidden dimensions and dropout as desired.
     query_encoder = QueryEncoder(
-        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.2
+        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.3
     )
     doc_encoder = DocumentEncoder(
-        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.2
+        embedding_tensor, hidden_dim=256, num_layers=1, bidirectional=True, dropout=0.3
     )
 
     query_encoder.to(device)
@@ -184,7 +184,10 @@ def main():
         num_batches = 0
 
         # Zip the two dataloaders. (Ensure they yield batches in corresponding order.)
-        for query_batch, (pos_batch, neg_batch) in tqdm(
+        for (query_batch, query_lengths), (
+            (pos_batch, pos_lengths),
+            (neg_batch, neg_lengths),
+        ) in tqdm(
             zip(query_train_dataloader, document_train_dataloader),
             desc=f"Iterating through training batches in epoch {epoch}",
         ):
@@ -196,9 +199,9 @@ def main():
             optimizer.zero_grad()
 
             # Forward pass: get embeddings.
-            query_embeds = query_encoder(query_batch)
-            pos_embeds = doc_encoder(pos_batch)
-            neg_embeds = doc_encoder(neg_batch)
+            query_embeds = query_encoder(query_batch, lengths=query_lengths)
+            pos_embeds = doc_encoder(pos_batch, lengths=pos_lengths)
+            neg_embeds = doc_encoder(neg_batch, lengths=neg_lengths)
 
             # Compute the loss using the custom triplet loss function.
             loss = criterion(query_embeds, pos_embeds, neg_embeds)
@@ -221,7 +224,10 @@ def main():
         total_val_loss = 0.0
         num_val_batches = 0
         with torch.no_grad():
-            for query_batch, (pos_batch, neg_batch) in tqdm(
+            for (query_batch, query_lengths), (
+                (pos_batch, pos_lengths),
+                (neg_batch, neg_lengths),
+            ) in tqdm(
                 zip(query_val_dataloader, document_val_dataloader),
                 desc=f"Iterating through validation batches in epoch {epoch}",
             ):
@@ -229,9 +235,9 @@ def main():
                 pos_batch = pos_batch.to(device)
                 neg_batch = neg_batch.to(device)
 
-                query_embeds = query_encoder(query_batch)
-                pos_embeds = doc_encoder(pos_batch)
-                neg_embeds = doc_encoder(neg_batch)
+                query_embeds = query_encoder(query_batch, lengths=query_lengths)
+                pos_embeds = doc_encoder(pos_batch, lengths=query_lengths)
+                neg_embeds = doc_encoder(neg_batch, lengths=query_lengths)
 
                 val_loss = criterion(query_embeds, pos_embeds, neg_embeds)
 
