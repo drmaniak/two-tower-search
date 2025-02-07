@@ -13,7 +13,7 @@ from eda.preprocess import convert_to_indices, pad_truncate
 from eda.two_tower_architecture import TwoTowerModel
 
 DATA_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/train_triples_v1.1.json'
-MODEL_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/model_twotower1.pth'
+MODEL_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/model_twotower2.pth'
 VOCAB_PATH = '/Users/yuliagoryachev/Documents/mlx/mlx_week2/two-tower-search/eda/word_to_ids.pkl'
 
 CONTEXT_LEN = 40
@@ -23,12 +23,12 @@ OUTPUT_DIM = 128
 LSTM_HIDDEN_DIM_QUERY = 128
 LSTM_HIDDEN_DIM_DOC = 256
 BATCH_SIZE = 64
-VOCAB_SIZE = 607348
+VOCAB_SIZE = 641955
 
 print('Load the data')
 with open(DATA_PATH) as f:
     train = json.load(f)
-    train = train[:940]
+    train = train[:5000]
 
 print('Load the word2idx')
 word2idx = joblib.load(VOCAB_PATH)
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     vector_store = Chroma(
     collection_name="mlx_wk2_collection",
     embedding_function=emb,
-    persist_directory="./chroma_langchain_db",  # Where to save data locally, remove if not necessary
+    persist_directory="../chroma_langchain_db",  # Where to save data locally, remove if not necessary
     )
     print('preparing documents')
     documents = []
