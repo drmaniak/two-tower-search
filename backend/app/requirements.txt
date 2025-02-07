@@ -1,0 +1,16 @@
+numpy
+pandas
+nltk
+gensim
+tqdm
+scikit-learn
+scipy
+datasets
+pyarrow
+torch
+torchvision
+torchaudio
+wandb
+chromadb
+fastapi[standard]
+streamlit
