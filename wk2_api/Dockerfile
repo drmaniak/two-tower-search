@@ -4,10 +4,17 @@ FROM python:3.11
 # Create a directory and move into it
 WORKDIR /code
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements in first, so that when we rebuild the image, it
 # can use the same layer (essentially the cache), and skip this part
-COPY ./requirements.txt /code/requirements.txt
+COPY requirements.txt /code/requirements.txt
 
 # Install all the requirements. Will also be skipped if not changes
 # have been made
