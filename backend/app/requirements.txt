@@ -12,5 +12,6 @@ torchvision
 torchaudio
 wandb
 chromadb
+langchain-chroma
 fastapi[standard]
 streamlit
